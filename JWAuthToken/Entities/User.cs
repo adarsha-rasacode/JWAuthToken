@@ -1,8 +1,10 @@
-﻿namespace JWAuthTokenDotNet9.Entities
+﻿
+//plain text user and pass 
+namespace JWAuthTokenDotNet9.Entities
 {
     public class User
     {
-
+        public Guid Id { get; set; }
         public string Username { get;  set; } =string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
     }

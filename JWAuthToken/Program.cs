@@ -1,3 +1,6 @@
+using JWAuthTokenDotNet9.Data;
+using JWAuthTokenDotNet9.Services;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -6,7 +9,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi("Ideal");
+builder.Services.AddOpenApi("Ideal"); 
+
+
+//Db registration
+builder.Services.AddDbContext<UserDbContext>(options => options.UseSqlServer(
+    builder.Configuration.GetConnectionString("UserDatabase")
+    ));
+
+//reg 
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 var app = builder.Build();
 
@@ -23,6 +35,10 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+
 app.MapControllers();
 
-app.Run();     
+app.Run();
+
+
+//https://localhost:7261/Scalar/Ideal
