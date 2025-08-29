@@ -3,10 +3,10 @@ using JWAuthTokenDotNet9.Entities;
 using JWAuthTokenDotNet9.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace JWAuthTokenDotNet9.Services
@@ -22,80 +22,123 @@ namespace JWAuthTokenDotNet9.Services
             _configuration = configuration;
         }
 
-        // LOGIN ---------------------------------------------------------------
-        async Task<string?> IAuthService.LoginAsync(UserDto request)
+        // LOGIN
+        public async Task<TokenResponseDto?> LoginAsync(UserDto request)
         {
-            // 1) Find user
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
-            if (user is null)
-                return null;
+            if (user is null) return null;
 
-            // 2) Verify password
-            var verify = new PasswordHasher<User>()
-                .VerifyHashedPassword(user, user.PasswordHash, request.Password);
+            var verify = new PasswordHasher<User>().VerifyHashedPassword(user, user.PasswordHash, request.Password);
+            if (verify == PasswordVerificationResult.Failed) return null;
 
-            if (verify == PasswordVerificationResult.Failed)
-                return null; // controller can return 401
+            var response = new TokenResponseDto
+            {
+                AccessToken = CreateToken(user),
+                RefreshToken = await GenerateAndSaveRefreshTokenAsync(user)
+            };
 
-
-            // 3) Issue JWT
-            return CreateToken(user);
+            return response;
         }
 
-        // REGISTER ------------------------------------------------------------
-        // NOTE: returning User? so we can return null when username exists
+        // REGISTER
         public async Task<User?> RegisterAsync(UserDto request)
         {
-            // 1) Ensure unique username
             var exists = await _context.Users.AnyAsync(u => u.Username == request.Username);
-            if (exists)
-                return null; // caller can translate to 409/BadRequest, etc.
+            if (exists) return null;
 
-            // 2) Create entity and hash password
             var user = new User
             {
                 Username = request.Username
             };
 
-            // Pass 'user' instance into hasher (best practice)
-            user.PasswordHash = new PasswordHasher<User>()
-                .HashPassword(user, request.Password);
+            user.PasswordHash = new PasswordHasher<User>().HashPassword(user, request.Password);
 
-            // 3) Save
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
             return user;
         }
 
-        // JWT CREATION --------------------------------------------------------
+        // VALIDATE REFRESH TOKEN
+        private async Task<User?> ValidateRefreshTokenAsync(Guid userId, string refreshToken)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user is null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+                return null;
+
+            return user;
+        }
+
+        // GENERATE REFRESH TOKEN
+        private string GenerateRefreshToken()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
+
+        private async Task<string> GenerateAndSaveRefreshTokenAsync(User user)
+        {
+            var refreshToken = GenerateRefreshToken();
+            user.RefreshToken = refreshToken;
+            user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+            Console.WriteLine("Saving Expiry: " + user.RefreshTokenExpiryTime?.ToString("O"));
+
+            await _context.SaveChangesAsync();
+            return refreshToken;
+        }
+
+        // JWT CREATION
         private string CreateToken(User user)
         {
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
-                // add roles/other claims here if you have them
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Role, user.Role ?? "User") // default to "User" if null
             };
 
-            // FIX: use _configuration (remove the stray 'configuration' field)
-            var keyBytes = Encoding.UTF8.GetBytes(
-                _configuration.GetValue<string>("AppSettings:Token")!
-            );
+            var keyBytes = Encoding.UTF8.GetBytes(_configuration["AppSettings:Token"]!);
             var key = new SymmetricSecurityKey(keyBytes);
-
-            // HS512 matches your earlier alg example; HS256 is also fine
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512);
 
             var token = new JwtSecurityToken(
-                issuer: _configuration.GetValue<string>("AppSettings:Issuer"),
-                audience: _configuration.GetValue<string>("AppSettings:Audience"),
+                issuer: _configuration["AppSettings:Issuer"],
+                audience: _configuration["AppSettings:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(1),  // 1-day token
+                expires: DateTime.UtcNow.AddDays(1),
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
+        public async Task<TokenResponseDto?> RefreshTokenAsync(RefreshTokenRequestDto request)
+        {
+            //  Find the user in DB
+            var user = await _context.Users.FindAsync(request.UserId);
+            if (user == null) return null; // User not found
+
+            //  Validate the refresh token
+            if (user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+            {
+                return null; // Invalid or expired token
+            }
+
+            // Generate new tokens
+            var newAccessToken = CreateToken(user);
+            var newRefreshToken = await GenerateAndSaveRefreshTokenAsync(user);
+
+            //  Prepare response DTO
+            var response = new TokenResponseDto
+            {
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken
+            };
+
+            return response;
+        }
+
     }
 }

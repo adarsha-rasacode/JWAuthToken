@@ -6,7 +6,8 @@ namespace JWAuthTokenDotNet9.Services
     public interface IAuthService
     {
         Task<User?> RegisterAsync(UserDto user);
-        Task<string?> LoginAsync(UserDto request); // method signature 
-       
+        Task<TokenResponseDto?> LoginAsync(UserDto request);
+        Task<TokenResponseDto?>RefreshTokenAsync(RefreshTokenRequestDto request);
+
     }
 }

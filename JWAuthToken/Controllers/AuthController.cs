@@ -1,7 +1,9 @@
 ﻿using JWAuthTokenDotNet9.Entities;
 using JWAuthTokenDotNet9.Models;
 using JWAuthTokenDotNet9.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Data;
 
 namespace JWAuthTokenDotNet9.Controllers
 {
@@ -9,7 +11,7 @@ namespace JWAuthTokenDotNet9.Controllers
     [ApiController]
     public class AuthController(IAuthService authService) : ControllerBase
     {
-      
+
 
         //user Registration Endpoint
         [HttpPost("Register")]
@@ -17,26 +19,49 @@ namespace JWAuthTokenDotNet9.Controllers
         {
             var user = await authService.RegisterAsync(request);
 
-            if (user is null ) 
-                {
+            if (user is null)
+            {
                 return BadRequest("Username already exists");
-                 }
+            }
             return Ok(user);
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<string>> Login(UserDto request) // Added 'request' parameter to the method
+        public async Task<ActionResult<TokenResponseDto>> Login(UserDto request) // Added 'request' parameter to the method
         {
-            var token =await authService.LoginAsync(request);
-            if(token is null )
+            var result = await authService.LoginAsync(request);
+            if (result is null)
             {
                 return BadRequest("Invalid username or password");
             }
 
-            return Ok(token);
+            return Ok(result);
 
         }
 
-        
+        [HttpPost("refresh-token")]
+        public async Task<ActionResult<TokenResponseDto>> RefreshToken(RefreshTokenRequestDto request) // Added 'request' parameter to the method
+        {
+            var result = await authService.RefreshTokenAsync(request);
+            if (result is null || result.AccessToken is null || result.RefreshToken is null)
+            {
+                return Unauthorized("Invalid refresh token");
+            }
+            return Ok(result);
+        }
+
+        [Authorize]
+        [HttpGet]
+        public IActionResult AuthenticatedOnlyEndpoint()
+        {
+            return Ok("If you see this, you are authenticated!");
+        }
+
+        [Authorize(Roles ="Admin")]
+        [HttpGet("admin-only")]
+        public IActionResult AdminOnlyEndpoint()
+        {
+            return Ok("you are authenticated as the Admin ");
+        }
     }
 }
