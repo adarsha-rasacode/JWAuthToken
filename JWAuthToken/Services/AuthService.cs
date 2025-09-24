@@ -83,8 +83,6 @@ namespace JWAuthTokenDotNet9.Services
             var refreshToken = GenerateRefreshToken();
             user.RefreshToken = refreshToken;
             user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
-            Console.WriteLine("Saving Expiry: " + user.RefreshTokenExpiryTime?.ToString("O"));
-
             await _context.SaveChangesAsync();
             return refreshToken;
         }
@@ -96,9 +94,10 @@ namespace JWAuthTokenDotNet9.Services
             {
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Role, user.Role ?? "User") // default to "User" if null
+                new Claim(ClaimTypes.Role, user.Role ?? "User")
             };
 
+       
             var keyBytes = Encoding.UTF8.GetBytes(_configuration["AppSettings:Token"]!);
             var key = new SymmetricSecurityKey(keyBytes);
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512);

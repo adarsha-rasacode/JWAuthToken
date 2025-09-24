@@ -31,7 +31,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["AppSettings:Issuer"],
-
             ValidateAudience = true,
             ValidAudience = builder.Configuration["AppSettings:Audience"],
 

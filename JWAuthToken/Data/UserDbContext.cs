@@ -12,6 +12,8 @@ namespace JWAuthTokenDotNet9.Data
         }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<Image> Images { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -22,5 +24,8 @@ namespace JWAuthTokenDotNet9.Data
                 .Property(u => u.Username)
                 .UseCollation("SQL_Latin1_General_CP1_CS_AS");
         }
+        
+
+
     }
 }
