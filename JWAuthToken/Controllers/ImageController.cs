@@ -12,12 +12,10 @@ namespace JWAuthTokenDotNet9.Controllers
     public class ImageController : ControllerBase
     {
         private readonly UserDbContext _context;
-        private readonly IWebHostEnvironment _env;
 
-        public ImageController(UserDbContext context, IWebHostEnvironment env)
+        public ImageController(UserDbContext context)
         {
             _context = context;
-            _env = env;
         }
 
         // 1️⃣ Upload image (Admin only)
@@ -80,5 +78,42 @@ namespace JWAuthTokenDotNet9.Controllers
 
             return Ok(images);
         }
+
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetImage(Guid id)
+        {
+            var image = await _context.Images.FindAsync(id);
+            if (image == null)
+                return NotFound("Image not found");
+
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "uploads", image.FileName);
+
+            if (!System.IO.File.Exists(filePath))
+                return NotFound("File not found on disk");
+
+            // Determine content type
+            var ext = Path.GetExtension(filePath).ToLower();
+            var contentType = ext switch
+            {
+                ".jpg" or ".jpeg" or ".jfif" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".webp" => "image/webp",
+                _ => "application/octet-stream"
+            };
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
+
+            // Force browser to render inline instead of download
+            Response.Headers.Add("Content-Disposition", $"inline; filename={image.FileName}");
+
+            return File(bytes, contentType);
+        }
+
+
+
+
     }
 }

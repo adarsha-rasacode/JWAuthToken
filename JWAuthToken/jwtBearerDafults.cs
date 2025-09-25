@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿//using Microsoft.AspNetCore.Authentication;
 
-internal class jwtBearerDafults
-{
-    internal static void AuthenticationScheme(AuthenticationOptions options)
-    {
-        throw new NotImplementedException();
-    }
-}
+//internal class jwtBearerDafults
+//{
+//    internal static void AuthenticationScheme(AuthenticationOptions options)
+//    {
+//        throw new NotImplementedException();
+//    }
+//}
