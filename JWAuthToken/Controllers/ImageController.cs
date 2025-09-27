@@ -80,6 +80,8 @@ namespace JWAuthTokenDotNet9.Controllers
         }
 
 
+        //endpoint : https://localhost:7261/api/image/f210aab7-a238-4a71-91d8-acf8c2a196f2
+        //FATCH IMAGE USING ID (User or Admin)
         [HttpGet("{id}")]
         public async Task<IActionResult> GetImage(Guid id)
         {
@@ -112,6 +114,38 @@ namespace JWAuthTokenDotNet9.Controllers
             return File(bytes, contentType);
         }
 
+        //CONTROLER TO FETCH IMAGE BY THE FILE NAME 
+        [HttpGet("byname/{fileName}")]
+        public async Task<IActionResult> GetImageByFileName(string fileName)
+        {
+            // Optional: decode URL in case of spaces or special chars
+            fileName = Uri.UnescapeDataString(fileName);
+
+            // Find image in DB (optional)
+            var image = await _context.Images.FirstOrDefaultAsync(i => i.FileName == fileName);
+            if (image == null)
+                return NotFound("Image not found");
+
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "uploads", image.FileName);
+
+            if (!System.IO.File.Exists(filePath))
+                return NotFound("File not found on disk");
+
+            var ext = Path.GetExtension(filePath).ToLower();
+            var contentType = ext switch
+            {
+                ".jpg" or ".jpeg" or ".jfif" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".bmp" => "image/bmp",
+                ".webp" => "image/webp",
+                _ => "application/octet-stream"
+            };
+
+            Response.Headers.Add("Content-Disposition", $"inline; filename={image.FileName}");
+            var bytes = await System.IO.File.ReadAllBytesAsync(filePath);
+            return File(bytes, contentType);
+        }
 
 
 
